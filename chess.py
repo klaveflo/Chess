@@ -19,13 +19,14 @@ BLUE = (0, 128, 255)
 IMAGES = {}
 
 def load_images():
-    IMAGES['pawn_white'] = pygame.image.load('assets/standard/pawn_white.png')
-    IMAGES['pawn_white'] = pygame.transform.scale(IMAGES['pawn_white'], (SQUARE_SIZE, SQUARE_SIZE))
+    for color in ['white', 'black']:
+        IMAGES[f'pawn_{color}'] = pygame.transform.scale(pygame.image.load(f'assets/standard/pawn_{color}.png'), (SQUARE_SIZE, SQUARE_SIZE))
+        IMAGES[f'rook_{color}'] = pygame.transform.scale(pygame.image.load(f'assets/standard/rook_{color}.png'), (SQUARE_SIZE, SQUARE_SIZE))
+        IMAGES[f'bishop_{color}'] = pygame.transform.scale(pygame.image.load(f'assets/standard/bishop_{color}.png'), (SQUARE_SIZE, SQUARE_SIZE))
+        IMAGES[f'knight_{color}'] = pygame.transform.scale(pygame.image.load(f'assets/standard/knight_{color}.png'), (SQUARE_SIZE, SQUARE_SIZE))
+        IMAGES[f'queen_{color}'] = pygame.transform.scale(pygame.image.load(f'assets/standard/queen_{color}.png'), (SQUARE_SIZE, SQUARE_SIZE))
+        IMAGES[f'king_{color}'] = pygame.transform.scale(pygame.image.load(f'assets/standard/king_{color}.png'), (SQUARE_SIZE, SQUARE_SIZE))
 
-    IMAGES['pawn_black'] = pygame.image.load('assets/standard/pawn_black.png')
-    IMAGES['pawn_black'] = pygame.transform.scale(IMAGES['pawn_black'], (SQUARE_SIZE, SQUARE_SIZE))
-
-    
 # --------------------------------------------------------------------------
 # Class to represent a chess piece, with its position and color
 class Piece:
@@ -57,6 +58,35 @@ class Piece:
         self.row = row
         self.col = col
         self.calc_pos()
+
+    def get_sliding_moves(self, board, directions):
+        # This method returns a list of valid moves for sliding pieces (rooks, bishops, queens)
+        
+        moves = []
+        for d_row, d_col in directions:
+            current_row = self.row + d_row
+            current_col = self.col + d_col
+
+            while 0 <= current_row < ROWS and 0 <= current_col < COLS:
+                target_piece = board.get_piece(current_row, current_col)
+
+                if target_piece == None:
+                    # field is empty, add to valid moves
+                    moves.append((current_row, current_col))
+                elif target_piece.color != self.color:
+                    # field is occupied by opponent's piece, add to valid moves and stop in this direction
+                    moves.append((current_row, current_col))
+                    break
+                else:
+                    # field is occupied by own piece, stop in this direction
+                    break
+
+                # Go one step further in the current direction
+                current_row += d_row
+                current_col += d_col
+
+        return moves
+
 # --------------------------------------------------------------------------
 # Class for pawn
 class Pawn(Piece):
@@ -99,6 +129,62 @@ class Pawn(Piece):
 
         return moves
 # --------------------------------------------------------------------------
+# Class for rook
+class Rook(Piece):
+    def __init__(self, row, col, color):
+        super().__init__(row, col, color, IMAGES[f'rook_{color}'])
+
+    def get_valid_moves(self, board):
+        # Rooks can move horizontally and vertically, so we define the directions for sliding moves
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)] # Up, Down, Left, Right
+        return self.get_sliding_moves(board, directions)  
+# --------------------------------------------------------------------------
+# Class for bishop
+class Bishop(Piece):
+    def __init__(self, row, col, color):
+        super().__init__(row, col, color, IMAGES[f'bishop_{color}'])
+
+    def get_valid_moves(self, board):
+        # Bishops can move diagonally, so we define the directions for sliding moves
+        directions = [(1, 1), (1, -1), (-1, 1), (-1, -1)] # Diagonal directions
+        return self.get_sliding_moves(board, directions)
+# --------------------------------------------------------------------------
+# Class for Queen
+class Queen(Piece):
+    def __init__(self, row, col, color):
+        super().__init__(row, col, color, IMAGES[f'queen_{color}'])
+
+    def get_valid_moves(self, board):
+        # Queens can move both like rooks and bishops, so we combine their directions
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+        return self.get_sliding_moves(board, directions)         
+# --------------------------------------------------------------------------
+# Class for Knight
+class Knight(Piece):
+    def __init__(self, row, col, color):
+        super().__init__(row, col, color, IMAGES[f'knight_{color}'])
+
+    def get_valid_moves(self, board):
+        # Knights move in an "L" shape: two squares in one direction and one square perpendicular
+        moves = []
+        jump_offsets = [
+            (2, 1), (2, -1), (-2, 1), (-2, -1),
+            (1, 2), (1, -2), (-1, 2), (-1, -2)
+        ]
+
+        for d_row, d_col in jump_offsets:
+            target_row = self.row + d_row
+            target_col = self.col + d_col
+
+            # Check if the target position is within the bounds of the board
+            if 0 <= target_row < ROWS and 0 <= target_col < COLS:
+                target_piece = board.get_piece(target_row, target_col)
+                # If target field is empty or occupied by an opponent's piece, it's a valid move
+                if target_piece == None or target_piece.color != self.color:
+                    moves.append((target_row, target_col))
+
+        return moves
+# --------------------------------------------------------------------------
 # Class for chess board, to handle remembering pieces
 class Board:
     def __init__(self):
@@ -107,7 +193,7 @@ class Board:
 
     def create_board(self):
         for row in range(ROWS):
-            self.board.append([]) #Add a new row to the board
+            self.board.append([]) # Add a new row to the board
             for col in range(COLS):
                 # row 1 black pawns
                 if row == 1:
@@ -115,11 +201,18 @@ class Board:
                 # row 6 white pawns
                 elif row == 6:
                     self.board[row].append(Pawn(row, col, "white"))
+
+
+                # Testing other pieces
+                elif row == 4 and col == 4:
+                    self.board[row].append(Knight(row, col, "white"))
+
+
                 # other rows are empty
                 else:
                     self.board[row].append(None)
     
-    def draw(self, window, selected_piece=None):
+    def draw(self, window, selected_piece=None, valid_moves=None):
         window.fill(WHITE)
 
         # Draw the chess board squares
@@ -139,6 +232,15 @@ class Board:
                 piece = self.board[row][col]
                 if piece != None:
                     piece.draw(window)
+
+        if valid_moves != None:
+            for move in valid_moves:
+                m_row, m_vol = move
+                # calculate the center of the square for the valid move
+                center_x = m_vol * SQUARE_SIZE + SQUARE_SIZE // 2
+                center_y = m_row * SQUARE_SIZE + SQUARE_SIZE // 2
+                # Draw a small circle at the center of the square to indicate a valid move
+                pygame.draw.circle(window, RED, (center_x, center_y), 15)
     
     def get_piece(self, row, col):
         # returns the piece at the given row and column, or None if there is no piece
@@ -170,10 +272,13 @@ def main():
     load_images() # Load piece images before starting the game loop
 
     selected_piece = None
+    valid_moves = [] # List to hold valid moves for the selected piece
     clock = pygame.time.Clock()
     run = True
 
     #first_piece = Piece(6, 2, RED) # Create a red piece at row 6, column 2
+
+    turn = "white" # Start with white's turn
     board = Board() # Create the chess board with pieces
 
     # Game loop
@@ -192,21 +297,28 @@ def main():
                 
                 # Case 1: A piece is already selected
                 if selected_piece != None:
-                    # Check if the clicked square is a valid move for the selected piece
-                    valid_moves = selected_piece.get_valid_moves(board)
                     # If it is, move the piece to the new location
                     if (row, col) in valid_moves:
                         board.move_piece(selected_piece, row, col)
+                        # Switch turns after a successful move
+                        if turn == "white":
+                            turn = "black"
+                        else:
+                            turn = "white"
+
                     selected_piece = None # Deselect the piece after moving
+                    valid_moves = [] # Clear valid moves after moving
 
                 # Case 2: No piece is selected, try to select a piece at the clicked location
                 else:
                     clicked_piece = board.get_piece(row, col)
-                    if clicked_piece != None:
+                    # Check if there is a piece at the clicked location and if it is the correct turn
+                    if clicked_piece != None and clicked_piece.color == turn:
                         selected_piece = clicked_piece # Select the piece that was clicked
+                        valid_moves = selected_piece.get_valid_moves(board) # Get valid moves for the selected piece
 
         # Draw the chess board
-        board.draw(window, selected_piece)
+        board.draw(window, selected_piece, valid_moves)
         pygame.display.update()
 
         
