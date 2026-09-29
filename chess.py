@@ -185,6 +185,32 @@ class Knight(Piece):
 
         return moves
 # --------------------------------------------------------------------------
+# Class for King
+class King(Piece):
+    def __init__(self, row, col, color):
+        super().__init__(row, col, color, IMAGES[f'king_{color}'])
+
+    def get_valid_moves(self, board):
+        moves = []
+        # King can move one square in any direction
+        directions = [
+            (1, 0), (-1, 0), (0, 1), (0, -1),
+            (1, 1), (1, -1), (-1, 1), (-1, -1)
+        ]
+
+        for d_row, d_col in directions:
+            target_row = self.row + d_row
+            target_col = self.col + d_col
+
+            if 0 <= target_row < ROWS and 0 <= target_col < COLS:
+                target_piece = board.get_piece(target_row, target_col)
+                
+                # Square is valid if it's empty or occupied by an opponent's piece
+                if target_piece == None or target_piece.color != self.color:
+                    moves.append((target_row, target_col))
+
+        return moves
+# --------------------------------------------------------------------------
 # Class for chess board, to handle remembering pieces
 class Board:
     def __init__(self):
@@ -192,23 +218,25 @@ class Board:
         self.create_board() # Initialize the board with pieces
 
     def create_board(self):
+        # Defines the back rank pieces in order for both colors
+        back_rank = [Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook]
+
         for row in range(ROWS):
             self.board.append([]) # Add a new row to the board
             for col in range(COLS):
-                # row 1 black pawns
-                if row == 1:
+                # Black back rank (row 0)
+                if row == 0:
+                    self.board[row].append(back_rank[col](row, col, "black"))
+                # Black pawns (row 1)
+                elif row == 1:
                     self.board[row].append(Pawn(row, col, "black"))
-                # row 6 white pawns
+                # White pawns (row 6)
                 elif row == 6:
                     self.board[row].append(Pawn(row, col, "white"))
-
-
-                # Testing other pieces
-                elif row == 4 and col == 4:
-                    self.board[row].append(Knight(row, col, "white"))
-
-
-                # other rows are empty
+                # White back rank (row 7)
+                elif row == 7:
+                    self.board[row].append(back_rank[col](row, col, "white"))
+                # Remaining squares are empty
                 else:
                     self.board[row].append(None)
     
@@ -235,9 +263,9 @@ class Board:
 
         if valid_moves != None:
             for move in valid_moves:
-                m_row, m_vol = move
+                m_row, m_col = move
                 # calculate the center of the square for the valid move
-                center_x = m_vol * SQUARE_SIZE + SQUARE_SIZE // 2
+                center_x = m_col * SQUARE_SIZE + SQUARE_SIZE // 2
                 center_y = m_row * SQUARE_SIZE + SQUARE_SIZE // 2
                 # Draw a small circle at the center of the square to indicate a valid move
                 pygame.draw.circle(window, RED, (center_x, center_y), 15)
@@ -251,6 +279,12 @@ class Board:
         self.board[piece.row][piece.col] = None # Remove piece from old location
         self.board[row][col] = piece # Place piece in new location
         piece.move(row, col) # Update the piece's internal position
+
+        # Check for pawn promotion
+        if isinstance(piece, Pawn):
+            if (piece.color == "white" and piece.row == 0) or (piece.color == "black" and piece.row == 7):
+                # Promote pawn to queen of same color
+                self.board[row][col] = Queen(row, col, piece.color)
 # --------------------------------------------------------------------------
 # Function to convert mouse position (in pixels) to board coordinates (row, col)
 def get_row_col_from_mouse(pos):
