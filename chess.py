@@ -310,7 +310,6 @@ def main():
     clock = pygame.time.Clock()
     run = True
 
-    #first_piece = Piece(6, 2, RED) # Create a red piece at row 6, column 2
 
     turn = "white" # Start with white's turn
     board = Board() # Create the chess board with pieces
