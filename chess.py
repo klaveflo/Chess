@@ -35,6 +35,7 @@ class Piece:
         self.col = col
         self.color = color
         self.image = image
+        self.has_moved = False # Track if the piece has ever moved (for rochade)
 
         # Calculate the exact pixel-position of the piece on the board
         self.x = 0
@@ -58,6 +59,7 @@ class Piece:
         self.row = row
         self.col = col
         self.calc_pos()
+        self.has_moved = True # Mark the piece as having moved
 
     def get_sliding_moves(self, board, directions):
         # This method returns a list of valid moves for sliding pieces (rooks, bishops, queens)
@@ -125,6 +127,9 @@ class Pawn(Piece):
                 if 0 <= new_col < COLS: # Ensure we don't go out of bounds
                     target_piece = board.get_piece(self.row + direction, new_col)
                     if target_piece != None and target_piece.color != self.color:
+                        moves.append((self.row + direction, new_col))
+                    # Check for en passant capture
+                    elif (self.row + direction, new_col) == board.en_passant_target:
                         moves.append((self.row + direction, new_col))
 
         return moves
@@ -209,12 +214,28 @@ class King(Piece):
                 if target_piece == None or target_piece.color != self.color:
                     moves.append((target_row, target_col))
 
+        if not self.has_moved:
+            # short rochade (king-side castling)
+            if board.get_piece(self.row, self.col + 1) == None and board.get_piece(self.row, self.col + 2) == None:
+                # Check if the rook is in the correct position and hasn't moved
+                right_rook = board.get_piece(self.row, self.col + 3)
+                if isinstance(right_rook, Rook) and not right_rook.has_moved:
+                    moves.append((self.row, self.col + 2)) # Add the castling move
+
+            # Long rochade (queen-side castling)
+            if board.get_piece(self.row, self.col - 1) == None and board.get_piece(self.row, self.col - 2) == None and board.get_piece(self.row, self.col - 3) == None:
+                # Check if the rook is in the correct position and hasn't moved
+                left_rook = board.get_piece(self.row, self.col - 4)
+                if isinstance(left_rook, Rook) and not left_rook.has_moved:
+                    moves.append((self.row, self.col - 2)) # Add the castling move
+
         return moves
 # --------------------------------------------------------------------------
 # Class for chess board, to handle remembering pieces
 class Board:
     def __init__(self):
         self.board = [] # 2D list to hold pieces
+        self.en_passant_target = None # To track en passant target square
         self.create_board() # Initialize the board with pieces
 
     def create_board(self):
@@ -275,10 +296,38 @@ class Board:
         return self.board[row][col]
     
     def move_piece(self, piece, row, col):
+        old_row, old_col = piece.row, piece.col
+
+        if isinstance(piece, Pawn) and (row, col) == self.en_passant_target:
+            self.board[old_row][col] = None  # Remove the captured pawn for en passant
+        
         # Move the piece in the board matrix and update its position
         self.board[piece.row][piece.col] = None # Remove piece from old location
         self.board[row][col] = piece # Place piece in new location
         piece.move(row, col) # Update the piece's internal position
+        piece.has_moved = True
+
+        # Rochade (castling) logic
+        if isinstance(piece, King) and abs(col - old_col) == 2:
+            if col > old_col: # Short castling (king-side)
+                rook = self.board[row][col + 1]
+                # Move rook to new position
+                self.board[row][col + 1] = None
+                self.board[row][col - 1] = rook
+                rook.move(row, col - 1)
+            else: # Long castling (queen-side)
+                rook = self.board[row][col - 2]
+                # Move rook to new position
+                self.board[row][col - 2] = None
+                self.board[row][col + 1] = rook
+                rook.move(row, col + 1)
+
+        # Update en passant target square
+        if isinstance(piece, Pawn) and abs(row - old_row) == 2:
+            skipped_row = (row + old_row) // 2
+            self.en_passant_target = (skipped_row, col) # Set the en passant target square
+        else:
+            self.en_passant_target = None # Reset en passant target if not a double pawn move
 
         # Check for pawn promotion
         if isinstance(piece, Pawn):
