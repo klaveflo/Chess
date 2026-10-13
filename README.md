@@ -8,9 +8,9 @@ A simple chess game built in Python using Pygame. I am developing this step-by-s
 - Alternating turn system (White moves first).
 - Visual move indicators showing valid moves and captures when a piece is selected.
 - Automatic pawn promotion to a Queen upon reaching the final rank.
+- Special Rules: Castling and en passant.
 
 ## Roadmap / Planned Features
-- Special Rules: Castling and en passant.
 - Game State Checks: Check, checkmate, stalemate, and preventing illegal King moves.
 - Pawn Promotion: Choice between Queen, Rook, Bishop, and Knight.
 - UI & Customization: Main menu and selectable piece themes/board styles.
